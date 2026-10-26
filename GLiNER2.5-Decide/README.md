@@ -16,7 +16,10 @@ uv sync
 uv run try.py                                   # Decide-1B, fp16
 uv run try.py --model fastino/GLiNER2.5-Decide  # 340M
 uv run try.py --fp32 --confidence               # vendor-precision weights, show confidences
+uv run try.py --docs notes/ a.md --confidence   # classify .md files (dirs searched recursively) by medical doc type
 ```
+
+`--docs` uses the categories in `MEDICAL_DOC_TASKS` in [try.py](try.py) and runs each file through `classify_text_long`, so long docs are chunked.
 
 Edit `CASES` in [try.py](try.py) to try your own text and schemas. `batch_classify_text` and `classify_text_long` (chunked) exist for many or long texts.
 
