@@ -218,3 +218,11 @@ __marimo__/
 
 # Streamlit
 .streamlit/secrets.toml
+
+# Model weights live in the Hugging Face cache, never in the repo
+*.safetensors
+*.bin
+*.gguf
+*.pt
+*.pth
+*.onnx
