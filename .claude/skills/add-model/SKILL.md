@@ -23,6 +23,16 @@ Decide three things:
 
 If the repo is gated, check that `hf auth whoami` works and that the user has accepted the terms. Otherwise ask them to do both before the download step.
 
+### Literature
+
+Search the web for write-ups of the model's architecture and training (model name, org, "arxiv", "architecture"). The card's links and the project's GitHub are a good start. Rank sources in this order:
+
+1. An arxiv paper (or tech report) on the model's architecture.
+2. A technical blog post that explains the architecture: Medium, the HF blog, Substack, an engineering blog. A launch announcement that doesn't explain how the model works doesn't count.
+3. The official page: the project's GitHub README or the company's site.
+
+Prefer sources about this exact model. When it is a fine-tune of a base model that has its own paper (Qwen, Llama, Gemma), cite the model's own best source first and add the base model's paper as a second source for the backbone. Use 1–3 sources, and read them, not only the abstracts or snippets. If nothing beyond the model card exists, say so in the section and cite the card.
+
 ## 2. Scaffold
 
 From the repo root, generate `pyproject.toml` and `.python-version`:
@@ -38,7 +48,7 @@ By default the template adds a `dev` group with ipykernel (the VS Code kernel) a
 Then, in `<Folder>/`, write:
 
 - **`try.ipynb`**: the default entry point (see below).
-- **`README.md`**: same shape as [GLiNER2.5-Decide/README.md](../../../GLiNER2.5-Decide/README.md). One paragraph on what the model is, who released it, when, the license and the package. A checkpoint table with size and vendor scores, labelled as vendor numbers. A **Run** section. For a notebook it covers opening it in VS Code over WSL, picking `<Folder>/.venv/bin/python` under **Select Kernel → Python Environments** and running all cells, plus the headless `nbconvert` command (copy the steps from [openjev/README.md](../../../openjev/README.md)). `## Findings` with `_Not tried yet._`.
+- **`README.md`**: same shape as [GLiNER2.5-Decide/README.md](../../../GLiNER2.5-Decide/README.md). One paragraph on what the model is, who released it, when, the license and the package. Right after it, a `## Model Overview` section from the literature search: 5–7 sentences on the architecture first (backbone, heads, how inference reads the output, size, context), then the training recipe (base model, data, objectives, tuning stages), followed by a bulleted list of the 1–3 sources used, each with a link and a few words on what it is (`arxiv paper`, `blog post`, `official page`). State only what the sources say. A `## Checkpoints` section with a checkpoint table with size and vendor scores, labelled as vendor numbers. A **Run** section. For a notebook it covers opening it in VS Code over WSL, picking `<Folder>/.venv/bin/python` under **Select Kernel → Python Environments** and running all cells, plus the headless `nbconvert` command (copy the steps from [openjev/README.md](../../../openjev/README.md)). `## Findings` with `_Not tried yet._`.
 
 Then `uv add <deps>` from the folder (it writes `uv.lock`).
 

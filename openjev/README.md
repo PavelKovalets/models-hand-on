@@ -1,6 +1,16 @@
 # openjev
 
-LoopAI's open-weight decision model (CC BY-NC 4.0, non-commercial; helper code Apache 2.0), released 2026-10. It's a 27B Qwen3.5-based model (`qwen3_5`, vision included) tuned so that one forward pass answers a typed question. You send a state (text, JSON, a DOM or a screenshot) plus questions of type `choice` (up to 52 options), `noul` (yes/no) or `score` (ordered levels). The answer is read from the option-letter scores at the first output position and calibrated into probabilities. There's no generation and nothing to parse. It is served by vLLM plus the vendor's `helper/shim.py`, which exposes `POST /v1/systemone`.
+LoopAI's open-weight decision model (CC BY-NC 4.0, non-commercial; helper code Apache 2.0), released 2026-09-20. It's a fine-tune of Qwen3.8-27B (HF architecture `qwen3_5`, vision included) tuned so that one forward pass answers a typed question. You send a state (text, JSON, a DOM or a screenshot) plus questions of type `choice` (up to 52 options), `noul` (yes/no) or `score` (ordered levels). The answer is read from the option-letter scores at the first output position and calibrated into probabilities. There's no generation and nothing to parse. It is served by vLLM plus the vendor's `helper/shim.py`, which exposes `POST /v1/systemone`.
+
+## Model Overview
+
+The backbone is Alibaba's Qwen3.8-27B, a dense vision-language model with 64 layers in a hybrid layout: each block of four has three Gated DeltaNet (linear attention) layers and one gated full-attention layer, each followed by an FFN, with 262k tokens of native context. OpenJev adds no new head. It gives each option a letter, asks the question and reads the base LM head's scores for exactly those letters at the first output position, so one forward pass produces one score per option for up to 52 options. The helper then calibrates those scores into probabilities you can threshold. Loop fine-tuned the base with LoRA adapters and merged them into the released weights. The training data was public web and desktop agent steps (each a screenshot, the page text and the action a person took) plus public classification tasks. The correct answer was moved around the option list during training, so the model picks by what an option says, not where it sits, and the answer-flip rate under shuffling fell from 18.5% to 2.3% (vendor numbers). Loop trained seven versions in five days and released the best one.
+
+- [Building OpenJev in five days](https://blog.tryloop.ai/building-openjev-in-five-days/): blog post by Loop, 2026-10-01, on the readout, training data and LoRA recipe.
+- [openjev/openjev model card](https://huggingface.co/openjev/openjev): official page, with the "How it works" paragraph and the base model's attribution in `NOTICE`.
+- [Qwen/Qwen3.8-27B model card](https://huggingface.co/Qwen/Qwen3.8-27B): official page for the backbone architecture. Qwen3.8-27B has no arxiv paper of its own.
+
+## Checkpoints
 
 | Checkpoint | Size | Used here | Text accuracy, 10k questions (vendor) |
 |---|---|---|---|
