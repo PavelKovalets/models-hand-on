@@ -1,0 +1,81 @@
+---
+name: add-model
+description: Set up a new open model in models-hand-on so it runs on the local RTX 5090. Takes an HF repo ID, URL or model name, checks size, license and fit, then scaffolds a uv project folder with a notebook and README, installs it, smoke-runs it on the GPU and adds the root README row. Use whenever the user wants to try, add, set up, play with or test-drive a model here ("let's try X", "add <org/repo>", "can we run X on the 5090?"), including a new variant of a model family that already has a folder.
+---
+
+# Add a model
+
+Take a model from an HF repo ID to a folder that runs on the 5090. Facts about the machine and the folder conventions are in CLAUDE.md. This skill holds the setup steps.
+
+## 1. Facts and fit
+
+```bash
+python3 .claude/skills/add-model/scripts/hf_facts.py <org/repo> [<org/repo> ...]
+```
+
+It prints license, gating, library, custom code, quantization, parameter count and weight size per format. Pass sibling repos too (the smaller sizes, the official AWQ/FP8/GGUF quants) when they're likely to matter. Then read the model card (`https://huggingface.co/<org/repo>/raw/main/README.md`) for the recommended package, minimum versions, usage snippet and vendor benchmark numbers.
+
+Decide three things:
+
+- **Folder.** Folder name = the main repo's name without the org, exactly (`fastino/GLiNER2.5-Decide` → `GLiNER2.5-Decide`). If a folder for the family already exists and the new model uses the same package and API, it's a variant: add it there as another `MODEL` option and a row in its README table. Don't make a new folder.
+- **Fit.** Weights load through 48 GB RAM into 32 GB VRAM, and inference needs headroom for activations and KV cache. Count the dtype you'll load at, not the stored one: F32 weights loaded as bf16 take half. Below about 25 GB, go ahead. Above that, or near 48 GB on disk, **stop and propose options**: an official quantized repo (FP8 runs natively on Blackwell, then AWQ/GPTQ, then GGUF with llama.cpp), bitsandbytes 4-bit, or a smaller sibling, with sizes for each. Wait for the user to choose.
+- **Stack.** Use what the card recommends: its own package, transformers, sentence-transformers or vLLM. Note any `trust_remote_code`, and any flash-attn or other compiled kernels (those need the CUDA toolkit, see CLAUDE.md).
+
+If the repo is gated, check that `hf auth whoami` works and that the user has accepted the terms. Otherwise ask them to do both before the download step.
+
+## 2. Scaffold
+
+From the repo root, generate `pyproject.toml` and `.python-version`:
+
+```bash
+python3 .claude/skills/add-model/scripts/new_project.py <Folder> --description "<one sentence>" [--python 3.12] [--cuda cu130] [--no-jupyter]
+```
+
+By default the template adds a `dev` group with ipykernel (the VS Code kernel) and nbconvert (for headless runs), so `uv sync` alone gives a folder that runs notebooks. Pass `--no-jupyter` only for a script-only folder. The template also keeps `package = false`, limits environments to Linux x86_64 and makes torch a direct dependency on the explicit PyTorch index. A `tool.uv.sources` entry doesn't apply to transitive dependencies, so don't remove torch. Pick `--python` from what the package supports. Change `--cuda` only if vLLM or another package pins a torch built for a different CUDA, and match the index to that pin rather than fighting it.
+
+Then, in `<Folder>/`, write:
+
+- **`try.ipynb`**: the default entry point (see below).
+- **`README.md`**: same shape as [GLiNER2.5-Decide/README.md](../../../GLiNER2.5-Decide/README.md). One paragraph on what the model is, who released it, when, the license and the package. A checkpoint table with size and vendor scores, labelled as vendor numbers. A **Run** section. `## Findings` with `_Not tried yet._`.
+
+Then `uv add <deps>` from the folder (it writes `uv.lock`).
+
+### The notebook
+
+Keep it short. Its job is to let the user poke at the model, not to be a benchmark harness. Cells:
+
+1. Markdown: model name, link, one line on what to edit.
+2. `MODEL = "<default repo>"`, with the variants in a comment, plus imports.
+3. Load: time it, print the GPU name, `torch.cuda.reset_peak_memory_stats()`.
+4. `CASES`: 3–4 realistic inputs that show what the model is for (for an embedder, pairs to compare; for a classifier, text and labels; for an LLM, a few prompts including one that's hard for it).
+5. Run: a warm-up call first, then each case with its ms timing.
+6. `print(f"peak VRAM {torch.cuda.max_memory_allocated() / 2**30:.2f} GiB")`.
+
+Write it as JSON with `nbformat` 4 and empty outputs.
+
+Use a script (`try.py` with argparse, like GLiNER's) instead only when a notebook gets clumsy: batch runs over files, CLI flags you'll keep changing, long-running servers such as `vllm serve`, or anything you'd pipe. Say why when you pick a script.
+
+## 3. Install and smoke-run
+
+From the folder:
+
+```bash
+uv sync
+uv run python -c "import torch; print(torch.cuda.get_device_name(), torch.version.cuda, torch.cuda.get_arch_list())"
+```
+
+`sm_120` must be in the arch list. If it's missing, the torch index or a pin is wrong. Fix that before going further.
+
+Then run the notebook once:
+
+```bash
+uv run jupyter nbconvert --to notebook --execute --inplace try.ipynb
+```
+
+This downloads the weights into the HF cache, so for big ones run it in the background. If it fails, fix the cause (missing dep, dtype, attention implementation, remote code) and rerun until the cells finish. A folder that doesn't run isn't done. Read the outputs. Report load time, per-case latency and peak VRAM, and whether the answers look sane.
+
+## 4. Root README and wrap-up
+
+Add a row to the Models table in the root README.md: `| [<Folder>](<Folder>/) | <one-line what> | – | – |`. Tried and Verdict stay `–` until the user records findings. For a variant, update the existing row's "What" cell.
+
+Finish with a short summary: what was set up, the fit numbers, the smoke-run numbers and anything odd. Then offer to commit, with a message like `Add the <Folder> folder` (or `Add <variant> to <Folder>`). Commit only if the user says yes.

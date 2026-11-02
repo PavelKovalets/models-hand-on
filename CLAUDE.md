@@ -14,11 +14,12 @@ A sandbox for trying new open models by hand on a local RTX 5090. It is not a pr
 
 ## Layout conventions
 
-- **One folder per model family**, named after the main HF repo exactly (`GLiNER2.5-Decide`). Variants that share a package and API live in the same folder and are chosen with a `--model` flag. They don't get folders of their own.
-- **Each folder is an independent uv project**: its own `pyproject.toml`, `uv.lock`, `.python-version` and `.venv`. There is no root workspace and nothing is shared between folders, because models pin conflicting torch, transformers and vLLM versions. Set `package = false`.
-- **pyproject pattern**: copy [GLiNER2.5-Decide/pyproject.toml](GLiNER2.5-Decide/pyproject.toml). `environments` is limited to Linux x86_64, and torch comes from the explicit `pytorch-cu130` index. torch has to be a direct dependency, because a `tool.uv.sources` entry doesn't apply to transitive ones. Change the CUDA index only if a model's stack needs a different one.
-- **Contents**: a notebook or scripts plus a README, whichever suits the model. Notebook folders need `uv add --dev ipykernel`. The folder README holds the model facts, how to run it and a **Findings** section. Mark vendor benchmark numbers as vendor numbers, separate from anything measured here.
-- **Root README**: every folder has a row in the Models table. Update its Tried and Verdict cells when findings land.
+To add a model or a variant, use the `add-model` skill ([.claude/skills/add-model](.claude/skills/add-model/SKILL.md)). It holds the setup steps.
+
+- **One folder per model family**, named after the main HF repo exactly (`GLiNER2.5-Decide`). Variants that share a package and API live in the same folder and are chosen with a `MODEL` setting or a `--model` flag. They don't get folders of their own.
+- **Each folder is an independent uv project**: its own `pyproject.toml`, `uv.lock`, `.python-version` and `.venv`. There is no root workspace and nothing is shared between folders, because models pin conflicting torch, transformers and vLLM versions.
+- **Contents**: a notebook by default, or a script when the notebook gets clumsy, plus a README with the model facts, how to run it and a **Findings** section. Mark vendor benchmark numbers as vendor numbers, separate from anything measured here.
+- **Root README**: when findings land, update the folder's Tried and Verdict cells in the Models table.
 
 ## Commands
 
@@ -26,7 +27,7 @@ Run these from inside a model folder:
 
 ```bash
 uv sync                      # create .venv from uv.lock
-uv run try.py                # or whatever the folder's entry point is
+uv run try.py                # script folders; notebooks run in VS Code on the .venv kernel
 uv add <pkg>                 # add a dependency and relock
 uv lock --upgrade-package <pkg>
 uv run python -c "import torch; print(torch.cuda.get_device_name(), torch.version.cuda, torch.cuda.get_arch_list())"
