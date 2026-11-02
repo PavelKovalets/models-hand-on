@@ -38,7 +38,7 @@ By default the template adds a `dev` group with ipykernel (the VS Code kernel) a
 Then, in `<Folder>/`, write:
 
 - **`try.ipynb`**: the default entry point (see below).
-- **`README.md`**: same shape as [GLiNER2.5-Decide/README.md](../../../GLiNER2.5-Decide/README.md). One paragraph on what the model is, who released it, when, the license and the package. A checkpoint table with size and vendor scores, labelled as vendor numbers. A **Run** section. `## Findings` with `_Not tried yet._`.
+- **`README.md`**: same shape as [GLiNER2.5-Decide/README.md](../../../GLiNER2.5-Decide/README.md). One paragraph on what the model is, who released it, when, the license and the package. A checkpoint table with size and vendor scores, labelled as vendor numbers. A **Run** section. For a notebook it covers opening it in VS Code over WSL, picking `<Folder>/.venv/bin/python` under **Select Kernel → Python Environments** and running all cells, plus the headless `nbconvert` command (copy the steps from [openjev/README.md](../../../openjev/README.md)). `## Findings` with `_Not tried yet._`.
 
 Then `uv add <deps>` from the folder (it writes `uv.lock`).
 
