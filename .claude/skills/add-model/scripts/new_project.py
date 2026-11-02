@@ -1,7 +1,7 @@
 """Write pyproject.toml and .python-version for a new model folder.
 
-`python3 new_project.py <Folder> --description "..." [--python 3.12] [--cuda cu130] [--no-jupyter]`
-Run from the repo root. Refuses to overwrite an existing pyproject.toml. Add deps afterwards with `uv add`.
+`python3 new_project.py <Folder> --description "..." [--python 3.12] [--cuda cu130] [--pytorch REQ ...] [--no-jupyter]`
+Run from the repo root. Refuses to overwrite an existing pyproject.toml. Add the other deps afterwards with `uv add`.
 """
 
 import argparse
@@ -15,7 +15,8 @@ version = "0.1.0"
 description = "{description}"
 requires-python = "{requires_python}"
 dependencies = [
-    "torch>=2.14",  # direct dependency so the CUDA index below applies
+    # PyTorch packages are direct dependencies so the CUDA index below applies to them
+{pytorch_deps}
 ]
 {dev}
 [tool.uv]
@@ -23,7 +24,7 @@ package = false
 environments = ["sys_platform == 'linux' and platform_machine == 'x86_64'"]  # runs in WSL only
 
 [tool.uv.sources]
-torch = {{ index = "pytorch-{cuda}" }}
+{pytorch_sources}
 
 [[tool.uv.index]]
 name = "pytorch-{cuda}"
@@ -44,23 +45,32 @@ def main() -> None:
     parser.add_argument("--description", required=True, help="one sentence on what the folder tries")
     parser.add_argument("--python", default="3.12", help="pinned minor version; requires-python allows only it")
     parser.add_argument("--cuda", default="cu130", help="PyTorch wheel index, change only if the stack needs it")
+    parser.add_argument(
+        "--pytorch", action="append", metavar="REQ",
+        help="a PyTorch-index requirement, repeatable (default torch>=2.14). Match the stack's pins, "
+             "e.g. --pytorch torch==2.13.0 --pytorch torchvision==0.28.0 for a vLLM that pins both",
+    )
     parser.add_argument("--no-jupyter", action="store_true", help="script-only folder, skip the ipykernel/nbconvert dev group")
     args = parser.parse_args()
 
     pyproject = args.folder / "pyproject.toml"
     if pyproject.exists():
         raise SystemExit(f"{pyproject} exists; this is a variant, edit that folder instead")
+    reqs = args.pytorch or ["torch>=2.14"]
+    names = [re.match(r"[A-Za-z0-9_.-]+", r).group(0).lower() for r in reqs]
     major, minor = args.python.split(".")[:2]
     args.folder.mkdir(parents=True, exist_ok=True)
     pyproject.write_text(TEMPLATE.format(
         name=re.sub(r"[^a-z0-9]+", "-", args.folder.name.lower()).strip("-"),
         description=args.description.replace('"', '\\"'),
         requires_python=f">={major}.{minor},<{major}.{int(minor) + 1}",
+        pytorch_deps="\n".join(f'    "{r}",' for r in reqs),
+        pytorch_sources="\n".join(f'{n} = {{ index = "pytorch-{args.cuda}" }}' for n in names),
         cuda=args.cuda,
         dev="" if args.no_jupyter else JUPYTER_DEV,
     ))
     (args.folder / ".python-version").write_text(f"{major}.{minor}\n")
-    print(f"wrote {pyproject} and .python-version ({major}.{minor}, {args.cuda})")
+    print(f"wrote {pyproject} and .python-version ({major}.{minor}, {args.cuda}, {', '.join(reqs)})")
 
 
 if __name__ == "__main__":

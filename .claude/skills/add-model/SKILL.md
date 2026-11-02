@@ -18,7 +18,7 @@ It prints license, gating, library, custom code, quantization, parameter count a
 Decide three things:
 
 - **Folder.** Folder name = the main repo's name without the org, exactly (`fastino/GLiNER2.5-Decide` → `GLiNER2.5-Decide`). If a folder for the family already exists and the new model uses the same package and API, it's a variant: add it there as another `MODEL` option and a row in its README table. Don't make a new folder.
-- **Fit.** Weights load through 48 GB RAM into 32 GB VRAM, and inference needs headroom for activations and KV cache. Count the dtype you'll load at, not the stored one: F32 weights loaded as bf16 take half. Below about 25 GB, go ahead. Above that, or near 48 GB on disk, **stop and propose options**: an official quantized repo (FP8 runs natively on Blackwell, then AWQ/GPTQ, then GGUF with llama.cpp), bitsandbytes 4-bit, or a smaller sibling, with sizes for each. Wait for the user to choose.
+- **Fit.** Weights load through 48 GB RAM into 32 GB VRAM, and inference needs headroom for activations and KV cache. Count the dtype you'll load at, not the stored one: F32 weights loaded as bf16 take half. Windows keeps about 3 GB of the card for itself (`nvidia-smi --query-gpu=memory.used --format=csv`), so only about 29 GB is really free. Below about 25 GB, go ahead. Above that, or near 48 GB on disk, **stop and propose options**: an official quantized repo (FP8 runs natively on Blackwell, then AWQ/GPTQ, then GGUF with llama.cpp), bitsandbytes 4-bit, or a smaller sibling, with sizes for each. Wait for the user to choose.
 - **Stack.** Use what the card recommends: its own package, transformers, sentence-transformers or vLLM. Note any `trust_remote_code`, and any flash-attn or other compiled kernels (those need the CUDA toolkit, see CLAUDE.md).
 
 If the repo is gated, check that `hf auth whoami` works and that the user has accepted the terms. Otherwise ask them to do both before the download step.
@@ -28,10 +28,12 @@ If the repo is gated, check that `hf auth whoami` works and that the user has ac
 From the repo root, generate `pyproject.toml` and `.python-version`:
 
 ```bash
-python3 .claude/skills/add-model/scripts/new_project.py <Folder> --description "<one sentence>" [--python 3.12] [--cuda cu130] [--no-jupyter]
+python3 .claude/skills/add-model/scripts/new_project.py <Folder> --description "<one sentence>" [--python 3.12] [--cuda cu130] [--pytorch REQ ...] [--no-jupyter]
 ```
 
-By default the template adds a `dev` group with ipykernel (the VS Code kernel) and nbconvert (for headless runs), so `uv sync` alone gives a folder that runs notebooks. Pass `--no-jupyter` only for a script-only folder. The template also keeps `package = false`, limits environments to Linux x86_64 and makes torch a direct dependency on the explicit PyTorch index. A `tool.uv.sources` entry doesn't apply to transitive dependencies, so don't remove torch. Pick `--python` from what the package supports. Change `--cuda` only if vLLM or another package pins a torch built for a different CUDA, and match the index to that pin rather than fighting it.
+`--pytorch` is repeatable and defaults to `torch>=2.14`. When the stack pins PyTorch packages, pass every pinned one, so they all come from the CUDA index and don't conflict. vLLM is the usual case: see its pins with `curl -s https://pypi.org/pypi/vllm/<ver>/json`, under `requires_dist`. For example: `--pytorch torch==2.13.0 --pytorch torchvision==0.28.0 --pytorch torchaudio==2.11.0`.
+
+By default the template adds a `dev` group with ipykernel (the VS Code kernel) and nbconvert (for headless runs), so `uv sync` alone gives a folder that runs notebooks. Pass `--no-jupyter` only for a script-only folder. The template also keeps `package = false`, limits environments to Linux x86_64 and makes the PyTorch packages direct dependencies on the explicit PyTorch index. A `tool.uv.sources` entry doesn't apply to transitive dependencies, so don't remove them. Pick `--python` from what the package supports. Change `--cuda` only if the stack needs a torch built for a different CUDA.
 
 Then, in `<Folder>/`, write:
 
@@ -51,7 +53,9 @@ Keep it short. Its job is to let the user poke at the model, not to be a benchma
 5. Run: a warm-up call first, then each case with its ms timing.
 6. `print(f"peak VRAM {torch.cuda.max_memory_allocated() / 2**30:.2f} GiB")`.
 
-Write it as JSON with `nbformat` 4 and empty outputs.
+Write it as JSON with `nbformat` 4.5, an `id` on every cell and empty outputs.
+
+When the model runs behind a server (vLLM, llama.cpp), put the server in a `serve.sh` and make the notebook its client. The model's memory then lives in another process, so read VRAM with `nvidia-smi` instead of `torch.cuda`.
 
 Use a script (`try.py` with argparse, like GLiNER's) instead only when a notebook gets clumsy: batch runs over files, CLI flags you'll keep changing, long-running servers such as `vllm serve`, or anything you'd pipe. Say why when you pick a script.
 
@@ -65,6 +69,8 @@ uv run python -c "import torch; print(torch.cuda.get_device_name(), torch.versio
 ```
 
 `sm_120` must be in the arch list. If it's missing, the torch index or a pin is wrong. Fix that before going further.
+
+vLLM on WSL needs two things: `VLLM_WSL2_ENABLE_PIN_MEMORY=1` (otherwise "UVA is not available"), and, with no CUDA toolkit installed, `VLLM_USE_FLASHINFER_SAMPLER=0` (otherwise "Could not find nvcc"). `--cpu-offload-gb` pins the offloaded weights. Windows caps pinned memory at about half the host's 61.6 GB, and nearing the cap can freeze Windows, so ask the user before offloading more than a few GB.
 
 Then run the notebook once:
 
