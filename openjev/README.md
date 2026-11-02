@@ -1,0 +1,37 @@
+# openjev
+
+LoopAI's open-weight decision model (CC BY-NC 4.0, non-commercial; helper code Apache 2.0), released 2026-10. It's a 27B Qwen3.5-based model (`qwen3_5`, vision included) tuned so that one forward pass answers a typed question. You send a state (text, JSON, a DOM or a screenshot) plus questions of type `choice` (up to 52 options), `noul` (yes/no) or `score` (ordered levels). The answer is read from the option-letter scores at the first output position and calibrated into probabilities. There's no generation and nothing to parse. It is served by vLLM plus the vendor's `helper/shim.py`, which exposes `POST /v1/systemone`.
+
+| Checkpoint | Size | Used here | Text accuracy, 10k questions (vendor) |
+|---|---|---|---|
+| [`openjev/openjev`](https://huggingface.co/openjev/openjev) | bf16, 51 GiB | no, too big for 32 GB VRAM and the 48 GB RAM load | 84.0% (served with online FP8) |
+| [`openjev/openjev-FP8`](https://huggingface.co/openjev/openjev-FP8) | FP8 e4m3, 28.3 GiB | **yes** | 84.2% |
+| [`openjev/openjev-GGUF`](https://huggingface.co/openjev/openjev-GGUF) | Q4_K_M 15.4 to Q8_0 26.6 GiB | no: text only, and the helper has no llama.cpp backend yet | Q4_K_M 82.8%, Q8_0 82.6% on a separate 1,789-question set |
+
+Other vendor numbers, all measured on one H100 with FP8: hosted Jev API 85.4% on the same 10k questions; next web action on unseen sites 87.4%; next desktop action from a screenshot 88.0%; answer flips under option shuffling 2.3%; about 80 ms for a short text decision and about 210 ms for a web step.
+
+**Fit on the 5090.** Windows already holds about 3 GiB of the card, so the 28.3 GiB of FP8 weights don't fit by themselves. `serve.sh` keeps `OFFLOAD_GB` (default 6) of them in RAM with vLLM's `--cpu-offload-gb`. That leaves 22.4 GiB of weights on the GPU and a 2.45 GiB KV cache (about 31k tokens, or 1.9 full 16k requests at a time). Every forward pass streams the offloaded weights over PCIe, so latencies are well above the vendor's.
+
+**WSL workarounds in `serve.sh`.**
+- `VLLM_WSL2_ENABLE_PIN_MEMORY=1`: vLLM's GPU worker needs pinned (UVA) memory, which it turns off on WSL2 by default (the error is "UVA is not available"). The offloaded weights are pinned too. Windows caps pinned memory at about half the host RAM (about 31 GB on this 61.6 GB machine), and vLLM warns that nearing the cap can freeze Windows. Keep `OFFLOAD_GB` well below it.
+- `VLLM_USE_FLASHINFER_SAMPLER=0`: FlashInfer's sampler is JIT-compiled and needs `nvcc`, which isn't installed. The one-token readout doesn't need it.
+
+## Run
+
+```bash
+uv sync
+./serve.sh                          # vLLM on :8000 and the helper on :3000, loopback only; Ctrl-C stops both
+OFFLOAD_GB=4 GPU_UTIL=0.9 ./serve.sh  # less offload if it fits, which is faster
+```
+
+Then open [try.ipynb](try.ipynb) on the `.venv` kernel and edit `CASES`. Or call the API directly:
+
+```bash
+curl -s localhost:3000/v1/systemone -H 'Content-Type: application/json' -d '{"model":"openjev","state":"Customer: charged twice!","questions":{"route":{"type":"choice","instructions":"Which team?","criteria":{"billing":null,"shipping":null}}}}'
+```
+
+Versions are pinned to the vendor's locked set (`vllm 0.29.0`, `torch 2.13.0+cu130`, `transformers 5.17.0`, `openai 3.16.2`), and the helper's calibration values in `serve.sh` are theirs. The helper file is downloaded into the HF cache unmodified.
+
+## Findings
+
+_Not tried yet._

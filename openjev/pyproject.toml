@@ -1,0 +1,33 @@
+[project]
+name = "openjev"
+version = "0.1.0"
+description = "Hands-on with OpenJev, a 27B one-pass decision model, as the FP8 build on vLLM with part of the weights offloaded to RAM."
+requires-python = ">=3.12,<3.13"
+dependencies = [
+    # Locked versions from the vendor's serve/SERVE.md; the card's numbers were measured with these.
+    "vllm==0.29.0",
+    "transformers==5.17.0",
+    "openai==3.16.2",  # the vendor shim's client
+    "httpx==0.28.1",
+    # vllm pins these; direct dependencies so the CUDA index below applies
+    "torch==2.13.0",
+    "torchvision==0.28.0",
+    "torchaudio==2.11.0",
+]
+
+[dependency-groups]
+dev = ["ipykernel>=7.4", "nbconvert>=7.17"]
+
+[tool.uv]
+package = false
+environments = ["sys_platform == 'linux' and platform_machine == 'x86_64'"]  # runs in WSL only
+
+[tool.uv.sources]
+torch = { index = "pytorch-cu130" }
+torchvision = { index = "pytorch-cu130" }
+torchaudio = { index = "pytorch-cu130" }
+
+[[tool.uv.index]]
+name = "pytorch-cu130"
+url = "https://download.pytorch.org/whl/cu130"
+explicit = true

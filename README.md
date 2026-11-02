@@ -7,6 +7,7 @@ Trying new open models hands-on, locally on an RTX 5090 (32 GB, Blackwell sm_120
 | Folder | What | Tried | Verdict |
 |---|---|---|---|
 | [GLiNER2.5-Decide](GLiNER2.5-Decide/) | Fastino schema classifiers, Decide-1B and 340M | – | – |
+| [openjev](openjev/) | LoopAI 27B one-pass decision model (text, DOM, screenshots), FP8 on vLLM with RAM offload | – | – |
 
 ## Machine setup (once)
 
