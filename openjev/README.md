@@ -24,7 +24,19 @@ uv sync
 OFFLOAD_GB=4 GPU_UTIL=0.9 ./serve.sh  # less offload if it fits, which is faster
 ```
 
-Then open [try.ipynb](try.ipynb) on the `.venv` kernel and edit `CASES`. Or call the API directly:
+With the servers running, open the notebook in VS Code:
+
+1. Open [try.ipynb](try.ipynb) from the VS Code window that's connected to WSL (the status bar at bottom left says `WSL: Ubuntu`). The first time, install the **Jupyter** and **Python** extensions when VS Code asks. They have to be installed in WSL, not only on Windows.
+2. Click **Select Kernel** at the top right, then **Python Environments**, and pick `openjev/.venv/bin/python`. If it isn't listed, choose **Enter interpreter path** and enter `~/models-hand-on/openjev/.venv/bin/python`. `uv sync` already installed `ipykernel` into that venv.
+3. Click **Run All**. Then edit `CASES` and rerun that cell and the one after it. The first two cells only set things up. `CASES` ends with the same inputs as GLiNER2.5-Decide's `try.py`, so you can compare the two models. To classify your own .md files by medical document type, put them in `DOCS` in the cell after that (GLiNER's `--docs`).
+
+Without VS Code, run it headless. The outputs are written back into the notebook:
+
+```bash
+uv run jupyter nbconvert --to notebook --execute --inplace try.ipynb
+```
+
+Or call the API directly:
 
 ```bash
 curl -s localhost:3000/v1/systemone -H 'Content-Type: application/json' -d '{"model":"openjev","state":"Customer: charged twice!","questions":{"route":{"type":"choice","instructions":"Which team?","criteria":{"billing":null,"shipping":null}}}}'
